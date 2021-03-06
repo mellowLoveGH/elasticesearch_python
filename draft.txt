@@ -1,0 +1,809 @@
+['Release Year', 'Title', 'Origin/Ethnicity', 'Director', 'Cast', 'Genre', 'Wiki Page', 'Plot']
+
+'Release Year': RY_range
+'Origin/Ethnicity': origin_range
+'Genre': genre_range
+
+#print(index, end="\t")
+RY = row[0] # Release Year
+Title = row[1] # Title
+Origin = row[2] # Origin
+Director = row[3] # Director
+Cast = row[4] # Cast
+Genre = row[5] # Genre
+WP = row[6] # Wiki Page
+Plot = row[7] # Plot
+
+
+{ "match": { 'Origin/Ethnicity':  origin }},
+{ "match": { 'Genre':  genre }},
+{ "match": { 'Director':  director }},
+
+
+
+query_body1 = {"query": {"match_all": {}}}
+query_body2 = {
+    "query":{
+        "term":{
+            'Title': 'The Matchmaker'
+        }
+    }
+}
+query_body3 = {
+    "query":{
+        "terms":{
+            "Release Year":[
+                1997, 2009
+            ]
+        }
+    }
+}
+#  term与terms, 查询 name='tom cat' 这个值不会分词必须完全包含
+
+query_body4 = {
+    "query":{
+        "match":{
+            'Origin/Ethnicity': 'British'
+        }
+    }
+}
+query_body5 = {
+    "query":{
+        "multi_match":{
+            "query":"British",
+            "fields":['Origin/Ethnicity',"Plot"]
+        }
+    }
+}
+query_body6 = {
+    "query":{
+        "bool":{
+            "must":[
+                {
+                    "term":{
+                        'Origin/Ethnicity': 'British'
+                    }
+                },
+                {
+                    "term":{
+                        'Release Year': 1997
+                    }
+                }
+            ]
+        }
+    }
+}
+# match: 匹配name包含"tom cat"关键字的数据, 会进行分词包含tom或者cat的
+query_body7 = {
+    "from":2,
+    "size":4,
+    "query":{
+        "match_all":{}
+    }
+}
+
+#gt: > 大于, lt: < 小于, gte: >= 大于或等于, lte: <= 小于或等于, 
+query_body8 = {
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { 'Origin/Ethnicity':  "British" }},
+        { "match": { 'Title':  "The Matchmaker" }}
+      ]
+    }
+  }
+}
+
+{
+  "query": {
+    "range": {
+      "Release Year":{
+            "gt":1996,
+            "lt":2010
+        }
+    },
+    "multi_match" : {
+      "query" : "British",
+      "fields" : [ 'Title', 'Plot'] 
+    }
+  }
+}
+
+,
+  "sort": [
+     {
+         "Release Year": {
+             "order": "desc"
+         }
+     }
+    ]
+
+
+
+
+setting = {
+    "settings": {
+        "analysis": {
+            "analyzer": {
+                "english_exact": {
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase"
+                    ]
+                }
+            }
+        }
+    }    
+}
+
+setting = {
+  "settings": {
+    "analysis": {
+      "filter": {
+        "english_stop": {
+          "type":       "stop",
+          "stopwords":  "_english_"
+        },
+        "light_english_stemmer": {
+          "type":       "stemmer",
+          "language":   "light_english" 
+        },
+        "english_possessive_stemmer": {
+          "type":       "stemmer",
+          "language":   "possessive_english"
+        }
+      },
+      "analyzer": {
+        "english": {
+          "tokenizer":  "standard",
+          "filter": [
+            "english_possessive_stemmer",
+            "lowercase",
+            "english_stop",
+            "light_english_stemmer", 
+            "asciifolding" 
+          ]
+        }
+      }
+    }
+  }
+}
+
+
+// https://qbox.io/blog/elasticsearch-algorithmic-stemming-tutorial
+setting = {
+  "settings": {
+    "analysis": {
+      "filter": {
+        "english_stop": {
+          "type": "stop",
+          "stopwords": "_english_"
+        },
+        "english_keywords": {
+          "type": "keyword_marker", 
+          "Keywords": ["lazy"] // stem_exclusion
+        },
+        "english_stemmer": {
+          "type": "stemmer",
+          "language": "english" 
+        },
+        "english_possessive_stemmer": {
+          "type": "stemmer",
+          "language": "possessive_english" 
+        }
+      },
+      "analyzer": {
+        "english": {
+          "tokenizer": "standard",
+          "filter": [
+            "english_possessive_stemmer",
+            "lowercase",
+            "english_stop",
+            "english_keywords",
+            "english_stemmer"
+          ]
+        }
+      }
+    }
+  }
+}
+
+
+
+// mapping
+netease_news_mapping = {
+    'properties': {
+        "id": {
+            "type": "keyword"
+        },
+        "url": {
+            "type": "keyword"
+        },
+        "title": {
+            "analyzer": "ik_smart",
+            "type": "text"
+        },
+        "content": {
+            "analyzer": "ik_smart",
+            "type": "text"
+        },
+        "create_time": {
+            "type": "text"
+        },
+        "type": {
+            "type": "keyword"
+        }
+    }
+}
+
+
+mapping文件 netease_news.json
+{
+	"dynamic": "strict",
+	"_source": {
+		"excludes": ["id"]
+	},
+	"properties": {
+		"id": {
+			"type": "keyword"
+		},
+		"url": {
+			"type": "keyword"
+		},
+		"title": {
+			"analyzer": "ik_smart",
+			"type": "text"
+		},
+		"content": {
+			"analyzer": "ik_smart",
+			"type": "text"
+		},
+		"create_time": {
+			"type": "text"
+		},
+		"type": {
+			"type": "keyword"
+		}
+	}
+}
+
+
+def create_index_and_mapping():
+    es.indices.delete(index='netease_news_v1', ignore=[400, 404])
+    es.indices.create(index='netease_news_v1', ignore=400)
+	
+	
+    es.indices.put_mapping(index='netease_news_v1', doc_type='news', body=netease_news_mapping, include_type_name=True)
+    es.indices.put_alias(index='netease_news_v1', name='netease_news')
+ 
+    es.indices.delete(index='netease_news_v2', ignore=[400, 404])
+    es.indices.create(index='netease_news_v2', ignore=400)
+	
+    netease_news_mapping_file = os.path.abspath(os.getcwd() + os.sep + 'mapping' + os.sep + 'netease_news.json')
+    with open(netease_news_mapping_file, 'rb') as mf:
+        lines = mf.readlines()
+    es.indices.put_mapping(index='netease_news_v2', doc_type='news', body=(''.join(lines)), include_type_name=True)
+    es.indices.put_alias(index='netease_news_v2', name='netease_news')
+
+
+setting文件 setting.json
+{
+    "settings" : {
+        "analysis" : {
+            "analyzer" : {
+                "pinyin_analyzer" : {
+                    "tokenizer" : "pinyin_tokenizer"
+                }
+            },
+            "tokenizer" : {
+                "pinyin_tokenizer" : {
+                    "type" : "pinyin",
+                    "keep_separate_first_letter" : false,
+                    "keep_full_pinyin" : true,
+                    "keep_original" : true,
+                    "limit_first_letter_length" : 16,
+                    "lowercase" : true,
+                    "remove_duplicated_term" : true
+                }
+            }
+        }
+    }
+}
+
+def create_or_update_setting():
+    setting_file = os.path.abspath(os.getcwd() + os.sep + 'setting' + os.sep + 'settings.json')
+    with open(setting_file, 'rb') as sf:
+        lines = sf.readlines()
+    es.indices.close(index='netease_news_v2')
+    es.indices.put_settings(index='netease_news_v2', body=(''.join(lines)))
+    es.indices.open(index='netease_news_v2')
+
+
+
+PUT _template/my_template
+{
+	 "index_patterns": [
+		"some_index*"
+	 ],
+	 "aliases": {
+		"some_index": {}
+	 },
+	 "settings": {
+		 "index.default_pipeline": "indexed_at",
+		 "number_of_replicas": 1,
+		 "refresh_interval": "30s"
+	 },
+	 "mappings": {
+	 "properties": {
+	 "cont_length":{
+	 "type":"long"
+	 },
+	 "author": {
+	 "type": "text",
+	 "fields": {
+	 "field": {
+	 "type": "keyword"
+	 }
+	 },
+	 "analyzer": "ik_max_word"
+	 },
+	 "contents": {
+	 "type": "text",
+	 "fields": {
+	 "field": {
+	 "type": "keyword"
+	 }
+	 },
+	 "analyzer": "ik_max_word",
+	 "fielddata": true
+	 },
+	 "timestamp": {
+	 "type": "date"
+	 },
+	 "title": {
+	 "type": "text",
+	 "fields": {
+	 "field": {
+	 "type": "keyword"
+	 }
+	 },
+	 "analyzer": "ik_max_word"
+	 },
+	 "type": {
+	 "type": "text",
+	 "fields": {
+	 "field": {
+	 "type": "keyword"
+	 }
+	 },
+	 "analyzer": "ik_max_word"
+	 }
+	 }
+	 }
+}
+PUT some_index_01
+
+//
+['Release Year', 'Title', 'Origin/Ethnicity', 'Director', 'Cast', 'Genre', 'Wiki Page', 'Plot']
+
+"mappings": 
+{
+	"properties": {
+		"cont_length":{
+			"type":"long"
+		},
+		
+		"author": {
+			"type": "text",
+			"fields": {
+				"field": {
+					"type": "keyword"
+				}
+			},
+			"analyzer": "ik_max_word"
+		},
+		
+		"contents": {
+			"type": "text",
+			"fields": {
+				"field": {
+					"type": "keyword"
+				}
+			},
+			"analyzer": "ik_max_word",
+			"fielddata": true
+		},
+		
+		"timestamp": {
+			"type": "date"
+		},
+		
+		"title": {
+			"type": "text",
+			"fields": {
+				"field": {
+					"type": "keyword"
+				}
+			},
+			"analyzer": "ik_max_word"
+		},
+		
+		"type": {
+			"type": "text",
+			"fields": {
+				"field": {
+					"type": "keyword"
+				}
+			},
+			"analyzer": "ik_max_word"
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[240]:
+
+
+from elasticsearch import helpers, Elasticsearch
+import numpy as np
+import pandas as pd
+
+
+def csv_reader(file_name):
+    data = pd.read_csv(file_name)
+    return data
+
+
+path = "C:/Users/13418/Desktop/practice_place/IR_place/wiki_movie_plots_deduped.csv"
+df = csv_reader(path)
+#print( df.head() )
+print( df.shape )
+
+#
+cols = []
+for col in df:
+    cols.append(col)
+print( cols )
+
+# sample of 1000 articles
+sample = df.sample(1000)
+#print( sample.head() )
+print( sample.shape )
+
+
+# In[250]:
+
+
+from datetime import datetime
+
+es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+
+
+# indexing
+
+mapping = {
+    "properties": {
+        "id":{
+            "type":"long"
+        },
+        "Release Year": {
+            "type": "keyword"
+        },
+        'Title':{
+            "type": "text",
+            "fields": {
+                "field": { "type": "keyword" }                
+            }
+        },
+        'Origin/Ethnicity':{
+            "type": "text",
+            "fields": {
+                "field": { "type": "keyword" }                
+            }
+        },
+        'Director': {
+            "type": "text",
+            "fields": {
+                "field": { "type": "keyword" }                
+            }
+        },
+        'Cast': {
+            "type": "text",
+            "fields": {
+                "field": { "type": "keyword" }                
+            }
+        },
+        'Genre': {
+            "type": "text",
+            "fields": {
+                "field": { "type": "keyword" }                
+            }
+        },
+        'Wiki Page': {
+            "type": "keyword"
+        },
+        'Plot': {
+            "type": "text",
+            "fields": {
+                "field": { "type": "keyword" }                
+            }
+        }
+    }
+}
+
+my_index = 'ir_hw'
+my_doc_type = 'movie'
+es.indices.delete(index=my_index, ignore=[400, 404])
+es.indices.create(index=my_index, ignore=400)
+es.indices.put_mapping(index=my_index, doc_type=my_doc_type, body=mapping, include_type_name = True)
+
+# deal with NaN
+sample = sample.replace(np.nan, '', regex=True)
+# upload a sample of 1000 articles with full text to Elasticsearch
+ind_list = []
+for ind, row in sample[0:30].iterrows():
+    my_doc = row.to_dict()
+    es.index(index=my_index, doc_type=my_doc_type, id=ind, body=my_doc) #, ignore=400)
+    ind_list.append( ind )
+
+print( ind_list[:5] )
+# test, any id
+res = es.get(index=my_index, id=ind_list[4])
+test_plot = res['_source']['Plot']
+print(test_plot) 
+print()
+
+
+def analyzeToStr(es, words):
+    re = es.indices.analyze(body={"analyzer" : "standard", "text" : words })
+    re = re['tokens']
+    tmp = set()
+    for it in re:
+        tmp.add(it['token'])
+    tmp = list(tmp)
+    return " ".join(tmp)
+
+test_plot = analyzeToStr(es, test_plot)
+test_plot
+
+
+# In[259]:
+
+
+RY_range = list( set( sample['Release Year'] ) )
+RY_range # 1914-2017
+
+origin_range = list( set( sample['Origin/Ethnicity'] ) )
+origin_range
+
+genre_range = list( set( sample['Genre'] ) )
+genre_range
+
+
+origin_range = " ".join(origin_range)
+print(origin_range)
+
+genre_range = " ".join(genre_range)
+genre_range
+
+
+re = es.indices.analyze(body={"analyzer" : "standard", "text" : genre_range })
+re = re['tokens']
+print( type(re) )
+genre_range = set()
+for it in re:
+    genre_range.add(it['token'])
+genre_range = list(genre_range)
+genre_range = " ".join(genre_range)
+genre_range
+print()
+
+
+# In[258]:
+
+
+# Stemming or Morphological Analysis
+setting1 = {
+    "settings": {
+        "analysis": {
+            "analyzer": {
+                "english_exact": {
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase"
+                    ]
+                }
+            }
+        }
+    }    
+}
+
+setting2 = {
+  "settings": {
+    "analysis": {
+      "filter": {
+        "english_stop": {
+          "type":       "stop",
+          "stopwords":  "_english_"
+        },
+        "light_english_stemmer": {
+          "type":       "stemmer",
+          "language":   "light_english" 
+        },
+        "english_possessive_stemmer": {
+          "type":       "stemmer",
+          "language":   "possessive_english"
+        }
+      },
+      "analyzer": {
+        "english": {
+          "tokenizer":  "standard",
+          "filter": [
+            "english_possessive_stemmer",
+            "lowercase",
+            "english_stop",
+            "light_english_stemmer", 
+            "asciifolding" 
+          ]
+        }
+      }
+    }
+  }
+}
+
+
+# closr first, then add settings, then open
+es.indices.close(index=my_index)
+es.indices.put_settings(index=my_index, body=setting2 )
+# es.indices.put_mapping(index=my_index, doc_type=my_doc_type, body=mapping, include_type_name = True)
+es.indices.open(index=my_index)
+
+# res = es.delete_by_query(index=my_index, body=query_body)
+#print(res)
+# https://blog.csdn.net/u013487601/article/details/103262667
+
+# https://github.com/AmoghM/ElasticSearch-in-Python/blob/master/Chapter9-Analyser.ipynb
+# https://zhuanlan.zhihu.com/p/43072517
+text1 = "HELLO today is A GREAT DAY"
+text2 = "The quick fox jumped and the lazy dog kept snoring"
+text3 = "buses, busses, simplicity, cuteness"
+es.indices.analyze(body={
+  "analyzer" : "english",
+  "text" : "Eating an apple a day keeps doctor away"
+})
+
+
+# •	Searching
+yearFrom = 1960
+yearTo = 2018
+queryText = "British Hong Kong Steve Cheng, Victor Tam, Herman Yau"
+queryText = "University of Central Arkansas student Chloe Steele"
+queryText = test_plot
+
+origin = ["British", "Hong Kong"]
+origin = "British Hong Kong"
+origin = origin_range
+
+genre = "unknown comedy"
+genre = genre_range
+
+searchContent = [ 'Title', 'Plot', 'Director', 'Cast', 'Wiki Page']
+
+query_body9 = {
+  "query": { 
+    "bool": { 
+      "must": [
+        { "multi_match": { "query": queryText, "fields" : searchContent } }  
+      ],
+      "filter": [ 
+        { "match": { 'Origin/Ethnicity':  origin }},
+        { "match": { 'Genre':  genre }},
+        { "range": { "Release Year":{"gt":yearFrom, "lt":yearTo} }} 
+      ]
+    }
+  }
+}
+
+# https://blog.csdn.net/u013429010/article/details/81746179
+# https://www.cnblogs.com/wangkun122/articles/10736507.html
+# https://blog.csdn.net/laoyang360/article/details/80468757
+# https://blog.csdn.net/y472360651/article/details/76652021
+# https://www.cnblogs.com/xiao987334176/p/10130712.html#autoid-1-5-1
+es.search(index=my_index, body=query_body9)
+
+
+# In[102]:
+
+
+es.indices.analyze(
+    body={
+      "analyzer" : "standard",
+      "text" : ["HELLO today is A GREAT DAY"]
+    }
+)
+
+analyzer = ['standard','simple','whitespace','stop','keyword','pattern','fingerprint']
+for analyze in analyzer:
+    res = es.indices.analyze(body={
+      "analyzer" : analyze,
+      "text" : ["HELLO WORLD. Today is the 2nd day of the week!!!!     it is Monday."]
+    })
+    print("======",analyze,"========")
+    for i in res['tokens']:
+        print(i['token'])
+    print("\n")
+
+
+# In[83]:
+
+
+# Sentence Splitting, Tokenization and Normalization
+def senSplit(article):
+    sen_dic = {}
+    s_counter = 1
+    sentence_delimiter = '.'
+    sentences = article.split(sentence_delimiter)
+    for sentence in sentences:
+        #sen_packet = create_data_packet(s_counter, sentence)
+        sentence = sentence.replace('\n', '').strip()
+        if len(sentence) > 0:
+            sen_dic[s_counter] = sentence.replace('\n', '').strip()
+            s_counter += 1
+    return sen_dic
+
+def create_data_packet(s_counter, sentence):
+    return {"sentence_id": s_counter, "sentence_text": sentence.replace('\n', '')}
+        
+
+# test, any id
+test_id = 5
+res = es.get(index=my_index, id=test_id)
+#print(res['_source']) 
+article = res['_source']['Plot']
+test_sen = senSplit(article)
+print( test_sen )
+
+
+query_body = { "query": {  "bool": {  "must": [ { "multi_match": { "query": queryText, "fields" : searchContent } } ],
+          "filter": [  { "match": { 'Origin/Ethnicity':  origin }}, { "match": { 'Genre':  genre }}, 
+                     { "range": { "Release Year":{"gt":yearFrom, "lt":yearTo} }}  ] } } }
+
