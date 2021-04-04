@@ -1,7 +1,9 @@
 # elasticesearch_python
 simple python search engine for csv-movie (every row is a movie with severa details) using elasticsearch
 
-tools/packages: Elasticsearch - ES
+data download: https://www.kaggle.com/jrobischon/wikipedia-movieplots?select=wiki_movie_plots_deduped.csv .
+
+tools/packages: Elasticsearch - ES, Kibana for visualization.
 language: python
 
 use ES to index files, to search with a query processed by TF-IDF, and then to parse the retrieved recalls.
