@@ -12,3 +12,6 @@ use ES to index files, to search with a query processed by TF-IDF, and then to p
 
 data is files from kaggle, movie files, every row is a movie than includes several features such as title, plot, release year, and so on.
 数据是电影文件，每一行都是一个电影，电影有几个属性：标题，内容，发布时间等等
+
+
+The continuation of this program is: ' python_elasticesearch_evaluation ' , link: https://github.com/mellowLoveGH/python_elasticesearch_evaluation .
